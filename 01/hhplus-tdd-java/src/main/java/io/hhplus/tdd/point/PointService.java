@@ -17,54 +17,51 @@ public class PointService {
 
     /*
     공동 제약 조건
-	    - 충전하고자 하는 금액은 항상 0보다 커야 한다.
-		- 사용자의 포인트는 음수면 안된다.
+	    - 충전/사용해야하는 포인트는 무조건 0보다 커야 한다.
     */
 
-    /**
-     * TODO - 특정 유저의 포인트를 조회하는 기능을 작성해주세요.
-     */
     public UserPoint getUserPoint(long id) {
         /*
 	    기능
-		    - 사용자의 포인트를 조회한다. = 사용자가 없으면 실패한다. -> 새로 생성됨
-		    - 결과를 반환한다.
+		    - 특정 사용자 포인트 조회 => 사용자 없으면 새로 생성
+		    - 결과 반환
         */
         UserPoint userPoint = userPointRepository.selectById(id);
-        System.out.println(userPoint.id());
+
+        // 사용자 없으면 새로 생성
+        if (userPoint == null) {
+            userPoint = UserPoint.empty(id);
+            userPointRepository.insertOrUpdate(userPoint.id(), userPoint.point());
+        }
+
+        // 결과 반환
         return userPoint;
     }
 
-    /**
-     * TODO - 특정 유저의 포인트 충전/이용 내역을 조회하는 기능을 작성해주세요.
-     */
     public List<PointHistory> getUserPointHistoryList(long id) {
         /*
 	    기능
-		    - 사용자의 포인트를 이력 조회한다. = 사용자가 없으면 실패한다. -> 새로 생성됨
-		    - 결과를 반환한다.
+		    - 특정 사용자 포인트 조회
+		    - 해당 사용자 포인트 이력 조회
+		    - 결과 반환
         */
-        UserPoint userPoint = userPointRepository.selectById(id);
-        List<PointHistory> pointHistoryList = pointHistoryRepository.selectAllByUserId(userPoint.id());
-        for(PointHistory history : pointHistoryList) {
-            System.out.println(history.toString());
-        }
-        return pointHistoryList;
+        UserPoint userPoint = getUserPoint(id);
+        return pointHistoryRepository.selectAllByUserId(userPoint.id());
     }
 
-    /**
-     * TODO - 특정 유저의 포인트를 충전/사용하는 기능을 작성해주세요.
-     */
     public UserPoint useUserPoint(long id, long amount, TransactionType type) {
         /*
 	    기능
-		    - 사용자의 포인트를 조회한다. = 사용자가 없으면 실패한다. -> 새로 생성됨
-		    - 사용할 포인트는 0보다 커야한다.
-		    - 사용자의 포인트와 입력받은 금액을 빼고 남은 금액이 음수면 안된다.
-		    - 결과를 저장(사용자 포인트 이력에 결과도 별도로 저장)하고, 그 결과를 반환한다.
+	        - 특정 사용자 포인트 조회
+	        - 입력된 포인트 수는 0이상인 양수
+	        - TransactionType 따른 충전/사용 조건 진행
+	            - TransactionType.USER 사용시 : 사용자 포인트 + 입력받은 금액 = 양수
+	        - 해당 사용자의 포인트 업데이트
+	        - 해당 사용자의 포인트 이력 저장
+	        - 결과 반환
         */
-        UserPoint userPoint = userPointRepository.selectById(id);
-        if (amount < 0) throw new RuntimeException();
+        UserPoint userPoint = getUserPoint(id);
+        if (amount < 0) throw new IllegalArgumentException("포인트가 유효하지 않습니다.");
 
         long resultPoint = 0;
         if (type.equals(TransactionType.CHARGE)) {
@@ -73,14 +70,14 @@ public class PointService {
         } else if (type.equals(TransactionType.USE)) {
             // 사용시
             resultPoint = userPoint.point() - amount;
-            if (resultPoint < 0) throw new RuntimeException();
+            if (resultPoint < 0) throw new IllegalArgumentException("사용하고자하는 포인트가 충분하지 않습니다.");
         } else {
             // 그 외
-            throw new RuntimeException();
+            throw new IllegalArgumentException("유효하지 않는 종류입니다.");
         }
 
-        userPointRepository.insertOrUpdate(userPoint.id(), resultPoint);                                            // UserPoint
-        pointHistoryRepository.insert(userPoint.id(), amount, TransactionType.USE, System.currentTimeMillis());     // pointHistory
+        userPointRepository.insertOrUpdate(userPoint.id(), resultPoint);                             // UserPoint
+        pointHistoryRepository.insert(userPoint.id(), amount, type, System.currentTimeMillis());     // pointHistory
 
         return userPointRepository.selectById(userPoint.id());
     }
