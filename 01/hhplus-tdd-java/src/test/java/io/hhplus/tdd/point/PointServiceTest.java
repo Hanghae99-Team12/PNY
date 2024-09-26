@@ -86,6 +86,21 @@ public class PointServiceTest {
         });
     }
 
+    // 공통 제약 조건 02 - 사용해야하는 포인트는 1,000단위로 사용
+    @Test
+    void checkUsePointValue() {
+        // given
+        long initialPoint = 21234L;
+        long amountToDeduct = 1234L;
+
+        // when
+        long resultPoint = initialPoint - (amountToDeduct / 1000L * 1000L);
+
+        // then
+        long expectedPoint = 20234L;
+        assertEquals(expectedPoint, resultPoint, "포인트가 1000 단위로 내림되어 차감됩니다.");
+    }
+
     // 기능01 - 특정 사용자 포인트 조회
     @Test
     void checkUserPoint() {

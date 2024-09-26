@@ -18,6 +18,7 @@ public class PointService {
     /*
     공동 제약 조건
 	    - 충전/사용해야하는 포인트는 무조건 0보다 커야 한다.
+	    - 사용해야 되는 포인트는 1,000단위로 사용된다.
     */
 
     public UserPoint getUserPoint(long id) {
@@ -68,8 +69,7 @@ public class PointService {
             // 충전시
             resultPoint = userPoint.point() + amount;
         } else if (type.equals(TransactionType.USE)) {
-            // 사용시
-            resultPoint = userPoint.point() - amount;
+            resultPoint = userPoint.point() - (amount / 1000 * 1000);     // 사용시 1,000단위로 사용됨
             if (resultPoint < 0) throw new IllegalArgumentException("사용하고자하는 포인트가 충분하지 않습니다.");
         } else {
             // 그 외
