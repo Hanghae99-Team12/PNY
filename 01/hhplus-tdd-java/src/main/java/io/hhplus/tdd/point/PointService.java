@@ -3,9 +3,13 @@ package io.hhplus.tdd.point;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 @Service
 public class PointService {
+
+    private final Lock lock = new ReentrantLock();
 
     private final UserPointRepository userPointRepository;
     private final PointHistoryRepository pointHistoryRepository;
@@ -61,25 +65,35 @@ public class PointService {
 	        - 해당 사용자의 포인트 이력 저장
 	        - 결과 반환
         */
-        UserPoint userPoint = getUserPoint(id);
-        if (amount < 0) throw new IllegalArgumentException("포인트가 유효하지 않습니다.");
 
-        long resultPoint = 0;
-        if (type.equals(TransactionType.CHARGE)) {
-            // 충전시
-            resultPoint = userPoint.point() + amount;
-        } else if (type.equals(TransactionType.USE)) {
-            resultPoint = userPoint.point() - (amount / 1000 * 1000);     // 사용시 1,000단위로 사용됨
-            if (resultPoint < 0) throw new IllegalArgumentException("사용하고자하는 포인트가 충분하지 않습니다.");
-        } else {
-            // 그 외
-            throw new IllegalArgumentException("유효하지 않는 종류입니다.");
+        // Lock 적용
+        lock.lock();
+
+        try {
+            UserPoint userPoint = getUserPoint(id);
+
+            if (amount < 0) throw new IllegalArgumentException("포인트가 유효하지 않습니다.");
+
+            long resultPoint = 0;
+            if (type.equals(TransactionType.CHARGE)) {
+                // 충전시
+                resultPoint = userPoint.point() + amount;
+            } else if (type.equals(TransactionType.USE)) {
+                long amountToUse = (amount / 1000 * 1000);              // 사용시 1,000단위로 사용됨
+                if (resultPoint < 0) throw new IllegalArgumentException("사용하고자하는 포인트가 충분하지 않습니다.");
+                resultPoint = userPoint.point() - amountToUse;
+            } else {
+                // 그 외
+                throw new IllegalArgumentException("유효하지 않는 종류입니다.");
+            }
+
+            userPointRepository.insertOrUpdate(userPoint.id(), resultPoint);                             // UserPoint
+            pointHistoryRepository.insert(userPoint.id(), amount, type, System.currentTimeMillis());     // pointHistory
+
+            return userPointRepository.selectById(userPoint.id());
+        } finally {
+            lock.unlock();
         }
-
-        userPointRepository.insertOrUpdate(userPoint.id(), resultPoint);                             // UserPoint
-        pointHistoryRepository.insert(userPoint.id(), amount, type, System.currentTimeMillis());     // pointHistory
-
-        return userPointRepository.selectById(userPoint.id());
     }
 
 }
