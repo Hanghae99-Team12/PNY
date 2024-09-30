@@ -198,19 +198,31 @@ public class PointServiceTest {
 
     // 동시성 제어
     @Test
-    public void checkConcurrency() throws Exception {
+    public void testConcurrentUseUserPoint() throws Exception {
         // given
         long id = 1L;
         long originPoint = 10000L;
 
         UserPoint user = new UserPoint(id, originPoint, System.currentTimeMillis());
-        given(userPointRepository.selectById(id)).willReturn(user);
+
+        // 포인트 값을 추적할 변수
+        AtomicLong currentPoint = new AtomicLong(originPoint);
+
+        given(userPointRepository.selectById(id)).willAnswer(invocation ->
+                new UserPoint(id, currentPoint.get(), System.currentTimeMillis())
+        );
+
+        doAnswer(invocation -> {
+            long updatedPoints = invocation.getArgument(1);
+            currentPoint.set(updatedPoints);
+            return null;
+        }).when(userPointRepository).insertOrUpdate(eq(id), anyLong());
 
         ExecutorService executorService = Executors.newFixedThreadPool(10);
 
         // 10번 포인트 사용
         List<Future<UserPoint>> futures = new ArrayList<>();
-        long amount = 1000L;  // 한 번에 사용할 포인트
+        long amount = 1000L;
 
         for (int i = 0; i < 10; i++) {
             Future<UserPoint> future = executorService.submit(() -> pointService.useUserPoint(id, amount, TransactionType.USE));
